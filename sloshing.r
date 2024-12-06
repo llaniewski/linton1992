@@ -14,18 +14,16 @@ plot(points,asp=1)
 segments(points[segments[,1],1],points[segments[,1],2],points[segments[,2],1],points[segments[,2],2])
 
 p = RTriangle::pslg(points,S = segments)
-?pslg
-ret = RTriangle::triangulate(p,a=0.03,q=30)
-?triangulate
+ret = RTriangle::triangulate(p,a=0.001,q=30)
+
 plot(ret$P,asp=1)
 segments(ret$P[ret$T[,1],1],ret$P[ret$T[,1],2],ret$P[ret$T[,2],1],ret$P[ret$T[,2],2])
 segments(ret$P[ret$T[,2],1],ret$P[ret$T[,2],2],ret$P[ret$T[,3],1],ret$P[ret$T[,3],2])
 segments(ret$P[ret$T[,3],1],ret$P[ret$T[,3],2],ret$P[ret$T[,1],1],ret$P[ret$T[,1],2])
 
-points(ret$P[unique(as.vector(ret$E[ret$EB == 1,])),],pch=16,cex=2)
-
 points = ret$P
 elements = ret$T
+edges = ret$E
 dofs = nrow(points)
 RHS = np.zeros(dofs)
 S = matrix(0,dofs, dofs)
@@ -46,17 +44,23 @@ image(S)
 image(M)
 
 sel = abs(points[,2])<0.0001
+SM = matrix(0,dofs,dofs) # surface mass matrix
 
+for (i in 1:nrow(edges)) {
+    el = edges[i,]
+    if (all(sel[el])) {
+        J = points[el[2],1] - points[el[1],1]
+        local_M = J * matrix(c(2,1,1,2),2,2) / 5
+        SM[el,el] = SM[el,el] + local_M
+    }
+}
 
+A = S[sel,sel] - S[sel,!sel] %*% solve(S[!sel,!sel],S[!sel,sel])
+B = SM[sel,sel]
 
-write.table(ret$P, "mesh/man_points.txt", row.names=FALSE,col.names=FALSE)
-write.table(ret$T-1, "mesh/man_triangles.txt", row.names=FALSE,col.names=FALSE)
+ret = geigen::geigen(A,B)
 
+plot(ret$values)
 
-tab = ret$P
-tab[] = sprintf("%.2f",tab)
-tab = paste0("[",tab[,1],",",tab[,1],"]")
-n = length(tab)
-tab = matrix(tab,nrow=3)
-tab[-(1:n)] = NA
-apply(tab,2,paste0,collapse=",")
+ret$values
+
